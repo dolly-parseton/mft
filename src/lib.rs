@@ -5,6 +5,9 @@ mod raw;
 mod attributes;
 mod readable_iterator;
 
+#[macro_use]
+extern crate serde;
+
 use block::BlockType;
 
 use crate::block::{Block, BlockInner};
@@ -15,6 +18,7 @@ use std::path::{Path, PathBuf};
 
 pub type Result<T> = std::result::Result<T, error::Error>;
 pub use crate::error::Error;
+pub use readable_iterator::Iterator;
 
 pub const MFT_RECORD_SIZE: u64 = 1024;
 
@@ -215,7 +219,6 @@ mod iterator_tests {
         let mut parser = MftParser::from_path(path).unwrap();
         for i in 0..parser.records {
             let _ = parser.get_file_path(i).unwrap();
-            // println!("{:?}", ;
         }
     }
 }

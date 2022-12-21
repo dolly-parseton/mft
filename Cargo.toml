@@ -3,10 +3,18 @@ name = "mft"
 version = "0.1.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[[bin]]
+name = "mft-cli"
+path = "src/bin/main.rs"
+required-features = ["build-binary"]
 
 [dependencies]
 byteorder = "1"
-chrono = "0.4"
+chrono = { version = "0.4", features = ["serde"] }
 uuid = {version = "1.1.2", features= ["v4"]}
 base64 = "0.13.0"
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", optional = true }
+
+[features]
+build-binary = ["serde_json"]

@@ -72,7 +72,8 @@ impl Entry {
             .read_to_end(&mut buffer)
             .map_err(|e| Error::into_buffer_fill_error(e.into(), offset, 48))?;
         // Generate header from first 48 bytes
-        let header = Header::from_buffer(&buffer)?;
+        let mut header_reader = Cursor::new(&buffer);
+        let header = Header::from_reader(&mut header_reader)?;
         // End early if header is zeroed
         if header.is_zeroed() {
             // If zeroed assume default size
@@ -141,7 +142,8 @@ impl Entry {
             .read_to_end(&mut buffer)
             .map_err(|e| Error::into_buffer_fill_error(e.into(), file_offset, 48))?;
         // Generate header from first 48 bytes
-        let header = Header::from_buffer(&buffer)?;
+        let mut header_reader = Cursor::new(&buffer);
+        let header = Header::from_reader(&mut header_reader)?;
 
         // println!("Header: {:?}", header);
         // println!("Offset: {:?}", file_offset);
@@ -244,8 +246,8 @@ impl Header {
             && self.base_mft_record == 0
             && self.next_attr_id == 0
     }
-    pub fn from_buffer(buffer: &[u8]) -> crate::Result<Self> {
-        let mut reader = BufReader::new(buffer);
+    pub fn from_reader<R: Read + Seek>(reader: &mut R) -> crate::Result<Self> {
+        // let mut reader = BufReader::new(buffer);
         //
         let mut sig_buffer: [u8; 4] = [0; 4];
         reader
