@@ -14,7 +14,10 @@ chrono = { version = "0.4", features = ["serde"] }
 uuid = {version = "1.1.2", features= ["v4"]}
 base64 = "0.13.0"
 serde = { version = "1", features = ["derive"] }
-serde_json = { version = "1", optional = true }
+serde_json = "1"
+simple_logger = { version = "4.0.0", optional = true }
+log = "0.4"
+regex = "1"
 
 [features]
-build-binary = ["serde_json"]
+build-binary = ["simple_logger"]

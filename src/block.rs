@@ -2,7 +2,7 @@ use std::io::{Read, Seek};
 
 #[derive(Debug, Clone)]
 pub struct Block {
-    pub blocks: Vec<BlockInner>,
+    pub blocks: Vec<SectionPointer>,
     pub entry_id: u64,
 }
 
@@ -12,7 +12,8 @@ impl Block {
         entry: &crate::raw::Entry,
         record_n: u64,
     ) -> crate::Result<Self> {
-        let mut blocks = vec![BlockInner {
+        trace!("Creating Block from Entry");
+        let mut blocks = vec![SectionPointer {
             block_type: BlockType::Entry,
             is_resident: true,
             attribute_id: None,
@@ -23,6 +24,7 @@ impl Block {
         // Create Attributes Blocks
         for attribute in &entry.attributes {
             use crate::raw::AttributeData;
+            // Get offsets based on if the attribute is resident or not
             let data_offset = entry.offset
                 + attribute.offset as u64
                 + match attribute.data {
@@ -44,7 +46,12 @@ impl Block {
                 AttributeData::Resident { .. } => true,
                 AttributeData::NonResident { .. } => false,
             };
-            blocks.push(BlockInner {
+            trace!(
+                "Creating SectionPointer for record {} of type {:?}",
+                record_n,
+                BlockType::from_attribute_type_code(attribute.type_code)
+            );
+            blocks.push(SectionPointer {
                 block_type: BlockType::from_attribute_type_code(attribute.type_code),
                 is_resident,
                 attribute_id: Some(attribute.instance),
@@ -55,7 +62,11 @@ impl Block {
             if BlockType::from_attribute_type_code(attribute.type_code) == BlockType::Data {
                 if let Some(name) = &attribute.name {
                     if name == "Zone.Identifier" {
-                        blocks.push(BlockInner {
+                        trace!(
+                            "Creating ZoneIdentifier SectionPointer for record {}",
+                            record_n
+                        );
+                        blocks.push(SectionPointer {
                             block_type: BlockType::ZoneIdentifier,
                             is_resident,
                             attribute_id: None,
@@ -75,7 +86,7 @@ impl Block {
 }
 
 #[derive(Debug, Clone)]
-pub struct BlockInner {
+pub struct SectionPointer {
     pub block_type: BlockType,
     pub is_resident: bool,
     pub attribute_id: Option<u16>,

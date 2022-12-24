@@ -7,7 +7,7 @@ pub enum Error {
     Reader(IoError),
     ValueRead(String),
     BufferFill(String),
-    MissingBlock,
+    MissingBlock(String, u64),
     MissingFileNameAttribute,
 }
 
@@ -30,6 +30,9 @@ impl Error {
             _ => unreachable!(),
         }
     }
+    pub fn missing_block(missing: &str, id: u64) -> Self {
+        Error::MissingBlock(missing.to_string(), id)
+    }
 }
 
 impl ErrTrait for Error {}
@@ -46,7 +49,9 @@ impl fmt::Display for Error {
             Error::Reader(error) => write!(f, "Reader error: {}", error),
             Error::ValueRead(error) => write!(f, "Value read error: {}", error),
             Error::BufferFill(error) => write!(f, "Buffer fill error: {}", error),
-            Error::MissingBlock => write!(f, "Missing block"),
+            Error::MissingBlock(missing_block, id) => {
+                write!(f, "Missing {} block with id {}", missing_block, id)
+            }
             Error::MissingFileNameAttribute => write!(f, "Missing file name attribute"),
         }
     }

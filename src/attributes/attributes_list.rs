@@ -46,7 +46,7 @@ impl AttributeList {
     pub fn resolve_to_blocks(
         &self,
         blocks: &[crate::block::Block],
-    ) -> Vec<(u64, crate::block::BlockInner)> {
+    ) -> Vec<(u64, crate::block::SectionPointer)> {
         let mut targets = Vec::new();
         // For each attribute list item match to entry by file reference and attribute id
         for attribute_item in &self.0 {
@@ -117,7 +117,7 @@ impl AttributeListItem {
 
 #[cfg(test)]
 mod tests {
-    use crate::MftParser;
+    use crate::Parser;
     use std::io::Cursor;
     use std::path::PathBuf;
     use std::str::FromStr;
@@ -176,7 +176,7 @@ mod tests {
         //
         let path = PathBuf::from_str("./.test_data/mft.mft").unwrap();
         println!("{:#?}", path);
-        let mut parser = MftParser::from_path(path).unwrap();
+        let mut parser = Parser::new(path).unwrap();
 
         let resolved = attribute_list.resolve_to_blocks(&parser.blocks);
         println!("{:#?}", resolved);

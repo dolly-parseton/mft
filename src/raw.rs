@@ -1,6 +1,6 @@
 use crate::error::Error;
 use byteorder::{ByteOrder, LittleEndian, ReadBytesExt};
-use std::io::{BufReader, Cursor, Read, Seek, SeekFrom};
+use std::io::{Cursor, Read, Seek, SeekFrom};
 
 // Helper bits
 
@@ -18,7 +18,6 @@ macro_rules! read_value {
 }
 
 // File reference - Used in header and a few attributes to reference other entires (.entry), we manually create an entry n with i on parse.
-
 #[derive(Clone, Debug)]
 // https://github.com/libyal/libfsntfs/blob/main/documentation/New%20Technologies%20File%20System%20(NTFS).asciidoc#53-the-file-reference
 pub struct FileReference {
@@ -63,6 +62,7 @@ pub struct Entry {
 
 impl Entry {
     pub fn get_entry_bytes<R: Read + Seek>(reader: &mut R, offset: u64) -> crate::Result<Vec<u8>> {
+        trace!("Reading entry bytes from offset {}", offset);
         // Ensure we're at the right offset
         reader.seek(SeekFrom::Start(offset))?;
         // Read first 48 bytes
@@ -77,6 +77,10 @@ impl Entry {
         // End early if header is zeroed
         if header.is_zeroed() {
             // If zeroed assume default size
+            trace!(
+                "Found zeroed entry, returning zeroed record of size {}",
+                crate::MFT_RECORD_SIZE
+            );
             reader
                 .take(crate::MFT_RECORD_SIZE - 48)
                 .read_to_end(&mut buffer)
@@ -89,6 +93,11 @@ impl Entry {
                 })?;
             return Ok(buffer);
         }
+        trace!(
+            "Reading {} bytes from offset {}",
+            header.total_entry_size - 48,
+            offset + 48
+        );
         // Read the rest of the data
         reader
             .take(header.total_entry_size as u64 - 48)
@@ -100,6 +109,8 @@ impl Entry {
                     header.total_entry_size as u64 - 48,
                 )
             })?;
+
+        trace!("Applying fixup values to entry bytes");
         // Get and apply fixup
         let fix_up: Vec<u8> = buffer[header.offset_to_fixup as usize
             ..(header.offset_to_fixup + header.num_of_fixup * 2 + 2) as usize]
@@ -132,24 +143,13 @@ impl Entry {
                     },
                 prev.entry_n + 1,
             ),
-
             None => (0, 0),
         };
-        // Get Entry Header to peek size of the rest of the entry
-        let mut buffer: Vec<u8> = Vec::new();
-        reader
-            .take(48)
-            .read_to_end(&mut buffer)
-            .map_err(|e| Error::into_buffer_fill_error(e.into(), file_offset, 48))?;
-        // Generate header from first 48 bytes
-        let mut header_reader = Cursor::new(&buffer);
+        // Get entry bytes
+        let entry_bytes = Self::get_entry_bytes(reader, file_offset)?;
+        let mut header_reader = Cursor::new(&entry_bytes[0..48]);
         let header = Header::from_reader(&mut header_reader)?;
-
-        // println!("Header: {:?}", header);
-        // println!("Offset: {:?}", file_offset);
-
         if header.is_zeroed() {
-            // If zeroed assume default size
             reader.seek(SeekFrom::Start(file_offset + crate::MFT_RECORD_SIZE))?;
             return Ok(Self {
                 offset: file_offset,
@@ -159,40 +159,13 @@ impl Entry {
             });
         }
 
-        // Read rest of entry to buffer for generating attributes
-        reader
-            .take(header.total_entry_size as u64 - 48)
-            .read_to_end(&mut buffer)
-            .map_err(|e| {
-                Error::into_buffer_fill_error(
-                    e.into(),
-                    file_offset + 48,
-                    header.total_entry_size as u64 - 48,
-                )
-            })?;
-
-        // Get and apply fixup
-        let fix_up: Vec<u8> = buffer[header.offset_to_fixup as usize
-            ..(header.offset_to_fixup + header.num_of_fixup * 2 + 2) as usize]
-            .to_vec();
-        for i in 1..(fix_up.len() / 2) {
-            // Replace last 2 bytes of each 512 sector
-            let replace_offset = i * 512 - 2;
-            let fix_up_offset = i * 2;
-            if replace_offset > buffer.len() {
-                break;
-            }
-            buffer[replace_offset] = fix_up[fix_up_offset];
-            buffer[replace_offset + 1] = fix_up[fix_up_offset + 1];
-        }
-
         // Get attributes
         let mut attributes: Vec<Attribute> = Vec::new();
-        let mut cursor = Cursor::new(&buffer);
+        let mut cursor = Cursor::new(&entry_bytes);
         let mut offset = header.attrs_offset as u64;
         cursor.seek(SeekFrom::Start(offset))?;
         // Iterate over buffer to get all attributes
-        while let Some(attribute) = Attribute::from_buffer(&buffer, offset)? {
+        while let Some(attribute) = Attribute::from_buffer(&entry_bytes, offset)? {
             if !Attribute::is_valid_type_code(attribute.type_code) {
                 break;
             }

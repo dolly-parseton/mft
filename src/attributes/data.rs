@@ -8,6 +8,7 @@ pub enum Data {
 }
 
 impl Data {
+    #[allow(dead_code)] // Used in tests
     pub fn from_buffer(buffer: &Vec<u8>, is_zone_identifier: bool) -> crate::Result<Self> {
         if is_zone_identifier {
             let mut reader = std::io::Cursor::new(buffer);
